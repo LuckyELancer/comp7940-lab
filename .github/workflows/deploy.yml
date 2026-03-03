@@ -2,28 +2,32 @@ name: AWS EC2 Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest   # must be ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.7.0
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          ssh-private-key: ${{ secrets.EC2_KEY }}
-
-      - name: Deploy application
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/chatbot_comp7940
-          git pull origin main
-          # Restart chatbot inside venv
-          pkill -f "python chatbot.py" || true
-          nohup ~/chatbot_comp7940/venv/bin/python chatbot.py > app.log 2>&1 &
-          EOF
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "=== 开始部署 ==="
+            cd \~/chatbot_comp7940 || git clone https://github.com/LuckyELancer/comp7940-lab.git \~/chatbot_comp7940
+            cd \~/chatbot_comp7940
+            git pull origin main || git reset --hard origin/main
+            
+            # 确保 venv 存在并激活
+            python3 -m venv venv 2>/dev/null || true
+            
+            # 杀掉旧进程并启动新进程
+            pkill -f "python chatbot.py" || true
+            nohup venv/bin/python chatbot.py > app.log 2>&1 &
+            echo "✅ 部署完成！"
+            echo "当前运行进程："
+            ps aux | grep -E 'chatbot|python'
